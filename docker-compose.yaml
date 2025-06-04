@@ -1,0 +1,108 @@
+services:
+
+  collabora:
+    environment:
+    - domain=subdomain\\.domain\\.es
+    - extra_params=--o:ssl.enable=false --o:ssl.termination=true --o:net.post_allow.host_whitelist=public-ip
+    image: collabora/code
+    networks:
+    - proxy_net
+    ports:
+    - 9980:9980
+    restart: always
+
+  db:
+    environment:
+    - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+    - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    - MYSQL_DATABASE=${MYSQL_DATABASE}
+    - MYSQL_USER=${MYSQL_USER}
+    image: mariadb:10.6
+    networks:
+    - proxy_net
+    restart: always
+    volumes:
+    - db:/var/lib/mysql
+
+  grafana:
+    container_name: grafana
+    environment:
+    - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER}
+    - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
+    image: grafana/grafana
+    networks:
+    - proxy_net
+    ports:
+    - 3000:3000
+    restart: unless-stopped
+    volumes:
+    - grafana_data:/var/lib/grafana
+
+  nextcloud:
+    depends_on:
+    - db
+    environment:
+    - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    - MYSQL_DATABASE=${MYSQL_DATABASE}
+    - MYSQL_USER=${MYSQL_USER}
+    - MYSQL_HOST=db
+    - NEXTCLOUD_ADMIN_USER=${NEXTCLOUD_ADMIN_USER}
+    - NEXTCLOUD_ADMIN_PASSWORD=${NEXTCLOUD_ADMIN_PASSWORD}
+    image: nextcloud
+    networks:
+    - proxy_net
+    restart: always
+    volumes:
+    - nextcloud:/var/www/html
+
+  node_exporter:
+    container_name: node_exporter
+    image: prom/node-exporter
+    networks:
+    - proxy_net
+    ports:
+    - 9100:9100
+    restart: unless-stopped
+
+  npm:
+    image: jc21/nginx-proxy-manager:latest
+    networks:
+    - proxy_net
+    ports:
+    - 80:80
+    - 443:443
+    - 83:81
+    restart: always
+    volumes:
+    - npm_data:/data
+    - npm_letsencrypt:/etc/letsencrypt
+
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus
+    networks:
+    - proxy_net
+    ports:
+    - 9090:9090
+    restart: unless-stopped
+    volumes:
+    - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    - prometheus_data:/prometheus
+
+  redis:
+    image: redis:alpine
+    networks:
+    - proxy_net
+    restart: always
+
+volumes:
+  db: 
+  grafana_data: 
+  nextcloud: 
+  npm_data: 
+  npm_letsencrypt: 
+  prometheus_data: 
+
+networks:
+  proxy_net:
+    driver: bridge
